@@ -2,6 +2,7 @@ import json
 import logging
 from collections.abc import AsyncIterable
 
+import ijson
 from dotenv import load_dotenv
 from google.protobuf import text_format
 from livekit import rtc
@@ -82,28 +83,36 @@ class Assistant(Agent):
             conn_options=conn_options,
             response_format=ResponseAndThinking,
         ) as stream:
-            accumulated_text = ""
+            accumulated = ""
+            last_response = ""
 
             async for chunk in stream:
                 if isinstance(chunk, llm.ChatChunk) and chunk.delta:
                     if chunk.delta.content:
-                        accumulated_text += chunk.delta.content
+                        accumulated += chunk.delta.content
 
-            # Parse the complete JSON and extract response
+                        # Try to extract the response field incrementally
+                        # Look for "response":"..." pattern
+                        try:
+                            # Parse what we have so far
+                            for prefix, event, value in ijson.parse(accumulated.encode("utf-8")):
+                                if prefix == "response" and event == "string":
+                                    current_response = value
+                                    if len(current_response) > len(last_response):
+                                        new_delta = current_response[len(last_response):]
+                                        yield new_delta
+                                        last_response = current_response
+                        except ijson.IncompleteJSONError:
+                            # JSON not complete yet, continue accumulating
+                            pass
+
+            # Parse final JSON to log thinking
             try:
-                data = json.loads(accumulated_text)
-                response = data.get("response", "")
-                thinking = data.get("thinking", "")
-
-                if thinking:
-                    logger.info(f"Chain of thought: {thinking}")
-
-                if response:
-                    yield response
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON: {e}")
-                # Fallback: yield the raw text
-                yield accumulated_text
+                data = json.loads(accumulated)
+                if "thinking" in data:
+                    logger.info(f"Chain of thought: {data['thinking']}")
+            except json.JSONDecodeError:
+                pass
 
 
 server = AgentServer()

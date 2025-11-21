@@ -4,7 +4,9 @@
       "Bash(uv run:*)",
       "mcp__livekit-docs__code_search",
       "mcp__livekit-docs__docs_search",
-      "mcp__livekit-docs__get_pages"
+      "mcp__livekit-docs__get_pages",
+      "WebFetch(domain:github.com)",
+      "Bash(uv add:*)"
     ],
     "deny": [],
     "ask": []
