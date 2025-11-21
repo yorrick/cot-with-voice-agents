@@ -116,8 +116,12 @@ class Assistant(Agent):
                         if len(last_response) > prev_len:
                             yield last_response[prev_len:]
 
-            # Close the parser
-            parser.close()
+            # Close the parser (may have incomplete JSON if tool was called)
+            try:
+                parser.close()
+            except ijson.IncompleteJSONError:
+                # Expected when stream ends due to tool call
+                pass
 
             # Log thinking
             if thinking_value:
@@ -149,6 +153,15 @@ async def my_agent(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=True,
     )
+
+    @session.on("function_tools_executed")
+    def on_function_tools_executed(event):
+        """Log tool calls after they are executed."""
+        for call, output in event.zipped():
+            logger.info(
+                f"Tool executed: {call.name} with args: {call.arguments} -> "
+                f"{'error' if output.is_error else 'success'}: {output.output}"
+            )
 
     await session.start(
         agent=Assistant(),
