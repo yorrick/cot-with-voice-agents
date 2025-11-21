@@ -83,36 +83,45 @@ class Assistant(Agent):
             conn_options=conn_options,
             response_format=ResponseAndThinking,
         ) as stream:
-            accumulated = ""
             last_response = ""
+            thinking_value = ""
+
+            # Create a target coroutine that receives events
+            def event_collector():
+                nonlocal last_response, thinking_value
+                while True:
+                    prefix, event, value = yield
+                    if prefix == "response" and event == "string":
+                        current_response = value
+                        if len(current_response) > len(last_response):
+                            last_response = current_response
+                    elif prefix == "thinking" and event == "string":
+                        thinking_value = value
+
+            # Create the push parser with our event collector
+            target = event_collector()
+            next(target)  # Prime the coroutine
+            parser = ijson.parse_coro(target)
 
             async for chunk in stream:
                 if isinstance(chunk, llm.ChatChunk) and chunk.delta:
                     if chunk.delta.content:
-                        accumulated += chunk.delta.content
+                        # Get current response length before sending
+                        prev_len = len(last_response)
 
-                        # Try to extract the response field incrementally
-                        # Look for "response":"..." pattern
-                        try:
-                            # Parse what we have so far
-                            for prefix, event, value in ijson.parse(accumulated.encode("utf-8")):
-                                if prefix == "response" and event == "string":
-                                    current_response = value
-                                    if len(current_response) > len(last_response):
-                                        new_delta = current_response[len(last_response):]
-                                        yield new_delta
-                                        last_response = current_response
-                        except ijson.IncompleteJSONError:
-                            # JSON not complete yet, continue accumulating
-                            pass
+                        # Send chunk to parser
+                        parser.send(chunk.delta.content.encode("utf-8"))
 
-            # Parse final JSON to log thinking
-            try:
-                data = json.loads(accumulated)
-                if "thinking" in data:
-                    logger.info(f"Chain of thought: {data['thinking']}")
-            except json.JSONDecodeError:
-                pass
+                        # Yield any new content
+                        if len(last_response) > prev_len:
+                            yield last_response[prev_len:]
+
+            # Close the parser
+            parser.close()
+
+            # Log thinking
+            if thinking_value:
+                logger.info(f"Chain of thought: {thinking_value}")
 
 
 server = AgentServer()

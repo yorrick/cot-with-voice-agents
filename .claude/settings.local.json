@@ -6,7 +6,10 @@
       "mcp__livekit-docs__docs_search",
       "mcp__livekit-docs__get_pages",
       "WebFetch(domain:github.com)",
-      "Bash(uv add:*)"
+      "Bash(uv add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
