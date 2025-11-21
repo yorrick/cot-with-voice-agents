@@ -1,7 +1,8 @@
+import json_stream
+from typing import Literal
+
 from google import genai
 from pydantic import BaseModel, Field
-from typing import Literal
-import json_stream
 
 
 class Feedback(BaseModel):
@@ -11,9 +12,7 @@ class Feedback(BaseModel):
 
 
 client = genai.Client()
-prompt = (
-    "The new UI is incredibly intuitive and visually appealing. Great job. Add a very long summary to test streaming!"
-)
+prompt = "The new UI is incredibly intuitive and visually appealing. Great job. Add a very long summary to test streaming!"
 
 response_stream = client.models.generate_content_stream(
     model="gemini-2.5-flash",

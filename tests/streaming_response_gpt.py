@@ -1,7 +1,8 @@
+import json_stream
+from typing import Literal
+
 from openai import OpenAI, pydantic_function_tool
 from pydantic import BaseModel, Field
-from typing import Literal
-import json_stream
 
 
 class Feedback(BaseModel):
@@ -11,9 +12,7 @@ class Feedback(BaseModel):
 
 
 client = OpenAI()
-prompt = (
-    "The new UI is incredibly intuitive and visually appealing. Great job. Add a very long summary to test streaming!"
-)
+prompt = "The new UI is incredibly intuitive and visually appealing. Great job. Add a very long summary to test streaming!"
 
 
 # 1. Define a Pydantic model for the tool’s input:
@@ -39,7 +38,11 @@ with client.responses.stream(
     ],
     text_format=Feedback,
 ) as response_stream:
-    text_chunks = (event.delta for event in response_stream if event.type == "response.output_text.delta")
+    text_chunks = (
+        event.delta
+        for event in response_stream
+        if event.type == "response.output_text.delta"
+    )
     # # data = json_stream.load(text_chunks, persistent=True)
     data = json_stream.load(text_chunks)
     # get the data without waiting for whole document to be received!
