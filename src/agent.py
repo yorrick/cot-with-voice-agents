@@ -105,7 +105,10 @@ class Assistant(Agent):
 
             async for chunk in stream:
                 if isinstance(chunk, llm.ChatChunk) and chunk.delta:
-                    if chunk.delta.content:
+                    # If there are tool calls, yield the chunk as-is
+                    if chunk.delta.tool_calls:
+                        yield chunk
+                    elif chunk.delta.content:
                         # Get current response length before sending
                         prev_len = len(last_response)
 
